@@ -24,8 +24,7 @@ def loadTrainingData():
     intMat=mat(intData)
     label=intMat[:,0]
     data=normalize(intMat[:,1:])
-    return data[:10,:],label[:10]
-    #return data,label
+    return data,label
 
 def loadTestData():
     rawData=[]
@@ -41,8 +40,7 @@ def loadTestData():
             intLine.append(int(stringNumber))#string-->int
         intData.append(intLine)
     data=normalize(mat(intData))
-    #return data
-    return data[:10]
+    return data
 
 def loadTestResult():
     rawData=[]
