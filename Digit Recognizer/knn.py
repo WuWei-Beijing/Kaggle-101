@@ -1,61 +1,31 @@
 import csv
-from numpy import *
-def normalize(data):
-    m,n=shape(data)
-    for i in range(m):
-        for j in range(n):
-            if data[i,j]!=0:
-                data[i,j]=1
-    return data
-    
-def loadTrainingData():
+import numpy as np
+path="C:\\Users\\wei\\Desktop\\Kaggle\\Kaggle101\\Digit Recognizer\\"
+def readCSVFile(file):
     rawData=[]
-    trainFile=open("C:\\Users\\wei\\Desktop\\Kaggle\\Kaggle101\\Digit Recognizer\\train.csv",'rb')
+    trainFile=open(path+file,'rb')
     reader=csv.reader(trainFile)
     for line in reader:
         rawData.append(line)#42001 lines,the first line is header
     rawData.pop(0)#remove header
-    intData=[]
-    for line in rawData:
-        intLine=[]
-        for stringNumber in line:
-            intLine.append(int(stringNumber))#string-->int
-        intData.append(intLine)
-    intMat=mat(intData)
-    label=intMat[:,0]
-    data=normalize(intMat[:,1:])
+    intData=np.array(rawData).astype(np.int32)
+    return intData
+    
+def loadTrainingData():
+    intData=readCSVFile("train.csv")
+    label=intData[:,0]
+    data=intData[:,1:]
+    data=np.where(data>0,1,0)#replace positive in feature vector to 1
     return data,label
 
 def loadTestData():
-    rawData=[]
-    testFile=open("C:\\Users\\wei\\Desktop\\Kaggle\\Kaggle101\\Digit Recognizer\\test.csv",'rb')
-    reader=csv.reader(testFile)
-    for line in reader:
-        rawData.append(line)
-    rawData.pop(0)#remove header
-    intData=[]
-    for line in rawData:
-        intLine=[]
-        for stringNumber in line:
-            intLine.append(int(stringNumber))#string-->int
-        intData.append(intLine)
-    data=normalize(mat(intData))
+    intData=readCSVFile("test.csv")
+    data=np.where(intData>0,1,0)
     return data
 
-def loadTestResult():
-    rawData=[]
-    resultFile=open("C:\\Users\\wei\\Desktop\\Kaggle\\Kaggle101\\Digit Recognizer\\knn_benchmark.csv",'rb')
-    reader=csv.reader(resultFile)
-    for line in reader:
-        rawData.append(line)
-    rawData.pop(0)#remove header
-    intData=[]
-    for line in rawData:
-        intLine=[]
-        for stringNumber in line:
-            intLine.append(int(stringNumber))#string-->int
-        intData.append(intLine)
-    data=mat(intData)
+def loadTestResult():  
+    intData=readCSVFile("knn_benchmark.csv")
+    data=np.mat(intData)
     return data[:,1]
     
 #inX marks the point we want to classify
@@ -63,8 +33,8 @@ def loadTestResult():
 #k marks the number we want to pick to be most closest to our test point
 def classify(inX,dataSet,labels,k):
     dataSetSize=dataSet.shape[0]
-    diffMat=tile(inX,(dataSetSize,1))-dataSet
-    sqDiffMat=array(diffMat)**2
+    diffMat=np.tile(inX,(dataSetSize,1))-dataSet
+    sqDiffMat=np.array(diffMat)**2
     sqDistance=sqDiffMat.sum(axis=1)
     distance=sqDistance**0.5
     sortedDistanceIndices=distance.argsort()
@@ -76,18 +46,21 @@ def classify(inX,dataSet,labels,k):
     return sortedClassCount[0][0]
 
 def saveResult(result):
-        myFile=open("C:\\Users\\wei\\Desktop\\Kaggle\\Kaggle101\\Digit Recognizer\\result.csv",'wb')    
+        myFile=open(path+"result.csv",'wb')    
         myWriter=csv.writer(myFile)
-        for i in result:
+        myWriter.writerow(['ImageId','Label'])
+        ind=range(len(result))
+        for i,val in zip(ind,result):
             line=[]
-            line.append(i)
+            line.append(i+1)
+            line.append(val)
             myWriter.writerow(line)
             
 def handwritingClassTest():
     trainData,trainLabel=loadTrainingData()
     testData=loadTestData()
     testLabel=loadTestResult()
-    m,n=shape(testData)
+    m,n=np.shape(testData)
     errorCount=0
     resultList=[]
     for i in range(m):
@@ -98,5 +71,5 @@ def handwritingClassTest():
     print "\nthe total number of errors is: %d" % errorCount
     print "\nthe total error rate is: %f" % (errorCount/float(m))
     saveResult(resultList)
-    
+   
 handwritingClassTest()
