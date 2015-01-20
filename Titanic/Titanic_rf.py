@@ -4,8 +4,8 @@ import re
 from sklearn.ensemble import RandomForestRegressor
 from sklearn import preprocessing
 path="C:\\Users\\wei\\Desktop\\Kaggle\\Kaggle101\\Titanic\\"  
-  
-############################step1:import the data#################################################    
+pd.set_option('precision', 4) 
+    ########################step1:import the data#################################################    
 def loadDataFrame():
     train_df=pd.read_csv(path+'train.csv')
     test_df=pd.read_csv(path+'test.csv')
@@ -20,7 +20,7 @@ def loadDataFrame():
     print "Row count:",df.shape[0]
     return df
 
-#########################step2:generating the features###########################################
+    ######################step2:generating the features###########################################
 ###Generate feature from the 'Plclass' variable
 def processPclass(df,keep_binary=False,keep_scaled=False):
     #fill in the missing value
@@ -243,7 +243,28 @@ def transformDataFrame(df):
     df=processEmbarked(df,keep_binary=True)
     df=processAge(df,keep_binary=True,keep_bins=True)
     df=processDrops(df)
-    print df
+    print "Starting with", df.columns.size, "manually generated features...\n", df.columns.values
+    ##########################Step3:add interactive features###################
+    numerics=df[['Names_scaled','SibSp_scaled','Parch_scaled','TicketPrefix_id_scaled','TicketNumberLen_scaled','Fare_scaled','CabinNumber_scaled']]
+    print "\nFeatures used for automated feature generation:\n", numerics.head(10)
+    new_fields_count=0
+    for i in range(0,numerics.columns.size-1):
+        for j in range(0,numerics.columns.size-1):
+            if i<=j:
+                name=str(numerics.columns.values[i])+'*'+str(numerics.columns.values[j])
+                df=pd.concat([df,pd.Series(numerics.iloc[:,i]*numerics.iloc[:,j],name=name)],axis=1)
+                new_fields_count+=1
+            if i < j:
+                name = str(numerics.columns.values[i]) + "+" + str(numerics.columns.values[j])
+                df = pd.concat([df, pd.Series(numerics.iloc[:,i] + numerics.iloc[:,j], name=name)], axis=1)
+                new_fields_count += 1
+            if not i == j:
+                name = str(numerics.columns.values[i]) + "/" + str(numerics.columns.values[j])
+                df = pd.concat([df, pd.Series(numerics.iloc[:,i] / numerics.iloc[:,j], name=name)], axis=1)
+                name = str(numerics.columns.values[i]) + "-" + str(numerics.columns.values[j])
+                df = pd.concat([df, pd.Series(numerics.iloc[:,i] - numerics.iloc[:,j], name=name)], axis=1)
+                new_fields_count += 2     
+    print "\n", new_fields_count, "new features generated"
     return df
 
 df=loadDataFrame()
