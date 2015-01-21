@@ -43,7 +43,7 @@ if __name__=='__main__':
     feature_importance=forest.feature_importances_
     feature_importance=100.0*(feature_importance/feature_importance.max())
     print "Feature importances:\n", feature_importance
-    fi_threshold=20
+    fi_threshold=15
     important_idx=np.where(feature_importance>fi_threshold)[0]
     important_features=features_list[important_idx]
     print "\n", important_features.shape[0], "Important features(>", fi_threshold, "percent of max importance)...\n",important_features
@@ -69,7 +69,7 @@ if __name__=='__main__':
     """
     sqrtfeat=int(np.sqrt(X.shape[1]))
     params_test={"n_estimators":[10000],
-                 "max_features":np.rint(np.linspace(sqrtfeat,sqrtfeat+2,3)).astype(int),
+                 "max_features":np.rint(np.linspace(sqrtfeat,sqrtfeat,3)).astype(int),
                  "min_samples_split":np.rint(np.linspace(X.shape[0]*0.01,X.shape[0]*0.2,30)).astype(int)}
     print "Hyperparameter opimization using RandomizedSearchCV..."
     rand_search=RandomizedSearchCV(forest,param_distributions=params_test,n_jobs=7,cv=3,n_iter=40)

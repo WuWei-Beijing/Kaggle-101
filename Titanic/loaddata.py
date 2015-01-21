@@ -65,7 +65,7 @@ def processName(df,keep_binary=False,keep_scaled=False,keep_bins=False):
     if keep_bins and keep_scaled:
         scaler=preprocessing.StandardScaler()
         df['Title_id_scaled']=scaler.fit_transform(df['Title_id'])
-    del df['Name'],df['Title_id_scaled']
+    del df['Name']
     return df
 
 ###Generate feature from 'Sex' variable
@@ -112,12 +112,9 @@ def processTicket(df,keep_binary=False,keep_bins=False,keep_scaled=False):
     df['TicketPrefix']=df['TicketPrefix'].map(lambda x:re.sub('STON','SOTON',x))
     
     df['TicketNumber']=df['Ticket'].map(lambda x:getTicketNumber(x))
-    df['TicketNumberLen']=df['TicketNumber'].map(lambda x:len(x)).astype(np.int)
     df['TicketNumberStart']=df['TicketNumber'].map(lambda x:x[0]).astype(np.int)
     
     if keep_binary:
-        #prefixes = pd.get_dummies(df['TicketPrefix']).rename(columns=lambda x: 'TicketPrefix_' + str(x))
-        #numberlen = pd.get_dummies(df['TicketNumberLen']).rename(columns=lambda x: 'TicketNumberLen_' + str(x))
         numberstart = pd.get_dummies(df['TicketNumberStart']).rename(columns=lambda x: 'TicketNumberStart_' + str(x))
         df = pd.concat([df, numberstart], axis=1)
     if keep_bins:
@@ -125,10 +122,9 @@ def processTicket(df,keep_binary=False,keep_bins=False,keep_scaled=False):
         df['TicketPrefix_id']=pd.factorize(df['TicketPrefix'])[0]+1      
     if keep_scaled:
         scaler = preprocessing.StandardScaler()
+        df['TicketNumber_scaled'] = scaler.fit_transform(df['TicketNumber'])
         df['TicketPrefix_id_scaled'] = scaler.fit_transform(df['TicketPrefix_id'])
-        df['TicketNumberLen_scaled'] = scaler.fit_transform(df['TicketNumberLen'])
-        #df['TicketNumberStart_scaled'] = scaler.fit_transform(df['TicketNumberStart'])
-    del df['Ticket'],df['TicketNumber'],df['TicketPrefix'],df['TicketNumberLen'],df['TicketNumberStart'],df['TicketPrefix_id']
+    del df['Ticket'],df['TicketNumber'],df['TicketPrefix'],df['TicketNumberStart'],df['TicketPrefix_id']
     return df
 
 ###Generate features from 'Fare'--Ticket Price
@@ -186,11 +182,12 @@ def processCabin(df,keep_binary=False,keep_scaled=False):
     if keep_scaled:
         scaler = preprocessing.StandardScaler()
         df['CabinNumber_scaled'] = scaler.fit_transform(df['CabinNumber'])
+        df['CabinLetter_scaled'] = scaler.fit_transform(df['CabinLetter'])
         del df['Cabin'],df['CabinNumber']
     return df
 
 ###Generate feature from 'Embarked'
-def processEmbarked(df,keep_binary=False):
+def processEmbarked(df,keep_binary=False,keep_scaled=False):
     #replace the missing values with most common port
     df['Embarked'][df['Embarked'].isnull()]=df.Embarked.dropna().mode().values
     #turn into number
@@ -198,6 +195,9 @@ def processEmbarked(df,keep_binary=False):
     # Create binary features for each port
     if keep_binary:
         df = pd.concat([df, pd.get_dummies(df['Embarked']).rename(columns=lambda x: 'Embarked_' + str(x))], axis=1)
+    if keep_scaled:
+        scaler=preprocessing.StandardScaler()
+        df['Embarked_scaled']=scaler.fit_transform(df['Embarked'])
     return df
 
 ###Generate feature from 'Age'--the most important feature
@@ -215,7 +215,7 @@ def setMissingAges(df):
     df['Age'][df.Age.isnull()]=predictedAges
     return df
 
-def processAge(df,keep_binary=False,keep_bins=False):
+def processAge(df,keep_binary=False,keep_bins=False,keep_scaled=False):
     df=setMissingAges(df)
     # have a feature for children
     df['isChild'] = np.where(df.Age < 13, 1, 0)
@@ -223,6 +223,9 @@ def processAge(df,keep_binary=False,keep_bins=False):
     df['Age_bin'] = pd.qcut(df['Age'], 4)
     if keep_binary:
         df = pd.concat([df, pd.get_dummies(df['Age_bin']).rename(columns=lambda x: 'Age_' + str(x))], axis=1)  
+    if keep_scaled:
+        scaler=preprocessing.StandardScaler()
+        df['Age_scaled']=scaler.fit_transform(df['Age'])
     del df['Age_bin']
     return df
 ###Delete the not useful columns
@@ -234,23 +237,25 @@ def processDrops(df):
 def getData():
     train_df,test_df,df=loadDataFrame()
     # generate features from individual variables present in the raw data
-    df=processPclass(df,keep_binary=True)
+    df=processPclass(df,keep_binary=True,keep_scaled=True)
     df=processName(df,keep_binary=True,keep_bins=True,keep_scaled=True)
     df=processSex(df)
     df=processFamily(df,keep_scaled=True)
     df=processTicket(df,keep_binary=True,keep_bins=True,keep_scaled=True)
     df=processFare(df,keep_scaled=True)
     df=processCabin(df,keep_binary=True,keep_scaled=True)
-    df=processEmbarked(df,keep_binary=True)
-    df=processAge(df,keep_binary=True,keep_bins=True)
+    df=processEmbarked(df,keep_binary=True,keep_scaled=True)
+    df=processAge(df,keep_binary=True,keep_bins=True,keep_scaled=True)
     df=processDrops(df)
     print "Starting with", df.columns.size, "manually generated features...\n", df.columns.values
     ##########################Step3:add interactive features###################
-    numerics=df[['Names_scaled','SibSp_scaled','Parch_scaled','TicketPrefix_id_scaled','TicketNumberLen_scaled','Fare_scaled','CabinNumber_scaled']]
+    numerics=df[['Names_scaled','SibSp_scaled','Parch_scaled','TicketPrefix_id_scaled','Fare_scaled','CabinNumber_scaled',
+                 'Pclass_scaled','Title_id_scaled','TicketNumber_scaled','CabinLetter_scaled','Embarked_scaled','Age_scaled']]
     print "\nFeatures used for automated feature generation:\n", numerics.head(10)
     new_fields_count=0
     for i in range(0,numerics.columns.size-1):
         for j in range(0,numerics.columns.size-1):
+            """
             if i<=j:
                 name=str(numerics.columns.values[i])+'*'+str(numerics.columns.values[j])
                 df=pd.concat([df,pd.Series(numerics.iloc[:,i]*numerics.iloc[:,j],name=name)],axis=1)
@@ -259,12 +264,15 @@ def getData():
                 name = str(numerics.columns.values[i]) + "+" + str(numerics.columns.values[j])
                 df = pd.concat([df, pd.Series(numerics.iloc[:,i] + numerics.iloc[:,j], name=name)], axis=1)
                 new_fields_count += 1
+            
             if not i == j:
                 name = str(numerics.columns.values[i]) + "/" + str(numerics.columns.values[j])
                 df = pd.concat([df, pd.Series(numerics.iloc[:,i] / numerics.iloc[:,j], name=name)], axis=1)
+           
                 name = str(numerics.columns.values[i]) + "-" + str(numerics.columns.values[j])
                 df = pd.concat([df, pd.Series(numerics.iloc[:,i] - numerics.iloc[:,j], name=name)], axis=1)
                 new_fields_count += 2     
+            """
     print "\n", new_fields_count, "new features generated"
     ################################Step4:Remove highly correlated features#########################
     df_corr=df.drop(['Survived','PassengerId'],axis=1).corr(method='spearman')
@@ -274,7 +282,7 @@ def getData():
     for col in df_corr.columns.values:
         if np.in1d([col],drops):
             continue
-        corr=df_corr.index[abs(df_corr[col])>0.98].values
+        corr=df_corr.index[abs(df_corr[col])>0.9].values
         drops=np.union1d(drops,corr)
     print "\nDropping",drops.shape[0],"highly correlated features"
     df.drop(drops,axis=1,inplace=True)
