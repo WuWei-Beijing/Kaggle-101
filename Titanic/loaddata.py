@@ -274,7 +274,7 @@ def getData():
     for col in df_corr.columns.values:
         if np.in1d([col],drops):
             continue
-        corr=df_corr.index[abs(df_corr[col])>0.9].values
+        corr=df_corr.index[abs(df_corr[col])>0.98].values
         drops=np.union1d(drops,corr)
     print "\nDropping",drops.shape[0],"highly correlated features"
     df.drop(drops,axis=1,inplace=True)
