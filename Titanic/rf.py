@@ -27,7 +27,7 @@ def report(grid_scores,n_top=10):
 
 if __name__=='__main__':
     print "\nGenerating initial training/test sets"
-    train_df,test_df=loaddata.getData()
+    train_df,test_df=loaddata.getData(keep_binary=True,keep_bins=True,keep_scaled=True,keep_interactive=True)
     #save the 'PassengerId' column
     test_ids=test_df['PassengerId']
     train_df.drop('PassengerId',axis=1,inplace=1)
@@ -43,7 +43,7 @@ if __name__=='__main__':
     feature_importance=forest.feature_importances_
     feature_importance=100.0*(feature_importance/feature_importance.max())
     print "Feature importances:\n", feature_importance
-    fi_threshold=15
+    fi_threshold=30
     important_idx=np.where(feature_importance>fi_threshold)[0]
     important_features=features_list[important_idx]
     print "\n", important_features.shape[0], "Important features(>", fi_threshold, "percent of max importance)...\n",important_features
@@ -61,8 +61,8 @@ if __name__=='__main__':
     X=X[:,important_idx][:,sorted_idx]
     X_test=X_test[:,important_idx][:,sorted_idx]
     print "\nSorted (DESC) Useful X:\n",X
-    train_df=train_df.iloc[:,important_idx].iloc[:,sorted_idx]
-    print '\nTraining with',X.shape[1],"features:\n",train_df.columns.values
+    test_df=test_df.iloc[:,important_idx].iloc[:,sorted_idx]
+    print '\nTraining with',X.shape[1],"features:\n",test_df.columns.values
     
     ########################Step6:Parameter tunning with CrossValidation(RandomSearch)###########
     ###Random search the best parameter
