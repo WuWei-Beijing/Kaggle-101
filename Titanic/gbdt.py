@@ -26,10 +26,10 @@ def report(grid_scores,n_top=10):
             params=score.parameters# record the highest score
     return params
 
-if __name__=='__main__':
-    print '\n Generating initial training/test sets'
-    train_df,test_df=loaddata.getData(keep_bins=True,keep_scaled=True,keep_interactive=False)
-    print '\n',train_df.columns.size,'Feed in features of GBDT',train_df.columns.values
+def Titanic_gbdt():
+    print '\nUsing Gradient Boosting Descision Tree, Generating initial training/test sets'
+    train_df,test_df=loaddata.getData(keep_bins=True,keep_scaled=True,keep_interactive_auto=True)
+    #print '\n',train_df.columns.size,'Feed in features of GBDT',train_df.columns.values
     #save the 'PassengerId' column
     test_ids=test_df['PassengerId']
     train_df.drop('PassengerId',axis=1,inplace=1)
@@ -43,13 +43,14 @@ if __name__=='__main__':
     clf=GradientBoostingClassifier(n_estimators=100,learning_rate=1,max_depth=3).fit(X,y)
     feature_importance=clf.feature_importances_
     feature_importance=100.0*(feature_importance/feature_importance.max())
-    print "Feature importances:\n", feature_importance
-    fi_threshold=1
+    #print "Feature importances:\n", feature_importance
+    fi_threshold=10
     important_idx=np.where(feature_importance>fi_threshold)[0]
     important_features=features_list[important_idx]
-    print "\n", important_features.shape[0], "Important features(>", fi_threshold, "percent of max importance)...\n",important_features
+    #print "\n", important_features.shape[0], "Important features(>", fi_threshold, "percent of max importance)...\n",important_features
     sorted_idx=np.argsort(feature_importance[important_idx])[::-1]
     #plot feature importance
+    """
     pos=np.arange(sorted_idx.shape[0])+0.5
     plt.subplot(1,2,2)
     plt.barh(pos,feature_importance[important_idx][sorted_idx[::-1]],align='center')
@@ -58,10 +59,11 @@ if __name__=='__main__':
     plt.title('Feature Importance')
     plt.draw()
     plt.show()
+    """
     #Remove non-important features from the feature set
     X=X[:,important_idx][:,sorted_idx]
     X_test=X_test[:,important_idx][:,sorted_idx]
-    print "\nSorted (DESC) Useful X:\n",X
+    #print "\nSorted (DESC) Useful X:\n",X
     test_df=test_df.iloc[:,important_idx].iloc[:,sorted_idx]
     print '\nTraining with', X.shape[1], "features:\n", test_df.columns.values
     ########################Step6:Parameter tunning with CrossValidation(RandomSearch)###########
@@ -80,7 +82,7 @@ if __name__=='__main__':
     """
     #==========================The best tunned parameters=========================================
     
-    params_score={'learning_rate':0.001,'max_depth':4,'min_samples_leaf':3,'max_features':0.8,'n_estimators':5000}
+    params_score={'learning_rate':0.001,'max_depth':4,'min_samples_leaf':3,'max_features':0.8,'n_estimators':5000,"random_state": 1234567890}
     params=params_score
     
     #============================================================================================
@@ -88,8 +90,6 @@ if __name__=='__main__':
     ########################Step7:Model generation/validation(Learning curve/Roc curve)#############
     print "Generating RandomForestClassifier model with parameters:",params
     clf=GradientBoostingClassifier(**params)
-    print "\nCalculating Learning Curve..."
-    print "\nCalculating  ROC curve ..."
     ###Predict the accuracy on test set(hold some data of training set to test)
     print "\nCalculating the Accuracy..."
     test_accs=[]
@@ -104,7 +104,11 @@ if __name__=='__main__':
     print "\nmean accuracy:",acc_mean,"and stddev:",acc_std
     ########################Step8:Predicting and Saving result######################################
     clf.fit(X,y)
-    submission=np.asarray(zip(test_ids,clf.predict(X_test))).astype(int)
+    return test_ids,clf.predict(X_test)
+    
+if __name__=='__main__':
+    test_ids,result=Titanic_gbdt()
+    submission=np.asarray(zip(test_ids,result)).astype(int)
     #ensure passenger IDs in ascending order
     output=submission[submission[:,0].argsort()]
     predict_file=open(path+"predict.csv",'wb')

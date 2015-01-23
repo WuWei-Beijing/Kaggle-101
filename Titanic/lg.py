@@ -1,9 +1,10 @@
 import loaddata
 import numpy as np
+from sklearn.linear_model import LogisticRegression
+import matplotlib.pyplot as plt
 import csv
-from sklearn.svm import SVC
+from sklearn.grid_search import GridSearchCV
 from sklearn.cross_validation import train_test_split
-from sklearn.grid_search import RandomizedSearchCV
 from operator import itemgetter
 path="C:\\Users\\wei\\Desktop\\Kaggle\\Kaggle101\\Titanic\\" 
 
@@ -25,10 +26,9 @@ def report(grid_scores,n_top=10):
             params=score.parameters# record the highest score
     return params
 
-def Titanic_svc():
-    print '\nUsing Support Vector Machine, Generating initial training/test sets'
-    train_df,test_df=loaddata.getData(keep_binary=True,keep_bins=True,keep_scaled=False)
-    #print '\n',train_df.columns.size,'Feed in features of SVM',train_df.columns.values
+def Titanic_lg():
+    print "\nUsing Logistic Regression,Generating initial training/test sets"
+    train_df,test_df=loaddata.getData(keep_binary=True,keep_bins=True,keep_scaled=True,keep_interactive_manually=True)
     #save the 'PassengerId' column
     test_ids=test_df['PassengerId']
     train_df.drop('PassengerId',axis=1,inplace=1)
@@ -37,84 +37,50 @@ def Titanic_svc():
     X=train_df.values[:,1:]
     y=train_df.values[:,0]
     X_test=test_df.values
-    svc=SVC()
-    ########################Step5: Reduce initial feature set with estimated feature importance####
-    print "\nfeed SVM with all binary features"
+    ########################Step5: Reduce initial feature set with estimated feature importance
+    
     ########################Step6:Parameter tunning with CrossValidation(RandomSearch)###########
     ###Random search the best parameter
     """
-    rbf_params = {"kernel": ['rbf'],
-                    "class_weight": ['auto'],
-                    "C": [0.5,1,3,5],
-                    "gamma": [0.01,0.05,0.1,0.5],
-                    "tol": 10.0**-np.arange(2,4),
-                    "random_state": [1234567890]}
-    
-    poly_params = {"kernel": ['poly'],
-                    "class_weight": ['auto'],
-                    "degree": [1,3,5,7],
-                    "C": [0.5,1,3,5],
-                    "gamma": 10.0**np.arange(-1, 1),
-                    "coef0": 10.0**-np.arange(1,2),
-                    "tol": 10.0**-np.arange(1,3),
-                    "random_state": [1234567890]}
-   
-    sigmoid_params = {"kernel": ['sigmoid'],
-                        "class_weight": ['auto'],
-                        "C": 10.0**np.arange(-2,6),
-                        "gamma": 10.0**np.arange(-3, 3),
-                        "coef0": 10.0**-np.arange(1,5),
-                        "tol": 10.0**-np.arange(2,4),
-                        "random_state": [1234567890]}
+    clf=LogisticRegression()
+    params_test={"penalty":['l1','l2'],
+                 "C":[0.1,0.3,1,3,10],
+                 "tol":[0.001,0.01,0.1],
+                 "random_state":[1234567890]}
     print "Hyperparameter opimization using RandomizedSearchCV..."
-    rand_search=RandomizedSearchCV(svc,param_distributions=poly_params,n_jobs=7,cv=3,n_iter=1000)
+    rand_search=GridSearchCV(clf,param_grid=params_test,n_jobs=7,cv=5)
     rand_search.fit(X,y)
     best_params=report(rand_search.grid_scores_)
     params=best_params
     """
     #==========================The best tunned parameters=========================================
-    
-    params_score = {"kernel": 'rbf',
-                    "class_weight": 'auto',
-                    "C": 3,
-                    "gamma": 0.1,
-                    "tol": 0.01,
-                    "random_state": 1234567890}
-    """
-    params_score = {"kernel": 'poly',
-                    "class_weight": 'auto',
-                    "degree":3,
-                    "C": 3,
-                    "gamma": 0.1,
-                    "coef0": 0.1,
-                    "tol": 0.01,
-                    "random_state": 1234567890}
-    """
+    ###Approach 1:Best tuned parameter for using all interactive features(Approach1) and fi_threshold=30
+
+    params_score={"penalty":'l1',"dual":False,"C":1,"tol":0.001,"random_state":1234567890}
     params=params_score
-    
+
     #============================================================================================
     
     ########################Step7:Model generation/validation(Learning curve/Roc curve)#############
-    print "Generating RandomForestClassifier model with parameters:",params
-    svc=SVC(**params)
+    print "Generating LogisticRegreesion model with parameters:",params
+    forest=LogisticRegression(**params)
     ###Predict the accuracy on test set(hold some data of training set to test)
     print "\nCalculating the Accuracy..."
     test_accs=[]
-    for i in range(1):
+    for i in range(5):
         X_train,X_hold,y_train,y_hold=train_test_split(X,y,test_size=0.3)
-        svc.fit(X_train,y_train)
-        acc=svc.score(X_hold,y_hold)
+        forest.fit(X_train,y_train)
+        acc=forest.score(X_hold,y_hold)
         print "\nAccuracy is:{:.4f}".format(acc)
         test_accs.append(acc)
     acc_mean="%.3f"%(np.mean(test_accs))
     acc_std="%.3f"%(np.std(test_accs))
     print "\nmean accuracy:",acc_mean,"and stddev:",acc_std
     ########################Step8:Predicting and Saving result######################################
-    svc.fit(X,y)
-    return test_ids,svc.predict(X_test)
+    return test_ids,forest.predict(X_test)
     
 if __name__=='__main__':
-    test_ids,result=Titanic_svc()
+    test_ids,result=Titanic_lg()
     submission=np.asarray(zip(test_ids,result)).astype(int)
     #ensure passenger IDs in ascending order
     output=submission[submission[:,0].argsort()]
