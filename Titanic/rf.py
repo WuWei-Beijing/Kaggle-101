@@ -106,7 +106,7 @@ def Titanic_rf():
     ###Predict the accuracy on test set(hold some data of training set to test)
     print "\nCalculating the Accuracy..."
     test_accs=[]
-    for i in range(3):
+    for i in range(5):
         X_train,X_hold,y_train,y_hold=train_test_split(X,y,test_size=0.3)
         forest.fit(X_train,y_train)
         acc=forest.score(X_hold,y_hold)
@@ -116,10 +116,10 @@ def Titanic_rf():
     acc_std="%.3f"%(np.std(test_accs))
     print "\nmean accuracy:",acc_mean,"and stddev:",acc_std
     ########################Step8:Predicting and Saving result######################################
-    return test_ids,forest.predict(X_test)
+    return test_ids,forest.predict(X_test),float(acc_mean)
     
 if __name__=='__main__':
-    test_ids,result=Titanic_rf()
+    test_ids,result,acc_mean=Titanic_rf()
     submission=np.asarray(zip(test_ids,result)).astype(int)
     #ensure passenger IDs in ascending order
     output=submission[submission[:,0].argsort()]

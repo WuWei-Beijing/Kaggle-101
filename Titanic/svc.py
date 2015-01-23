@@ -100,7 +100,7 @@ def Titanic_svc():
     ###Predict the accuracy on test set(hold some data of training set to test)
     print "\nCalculating the Accuracy..."
     test_accs=[]
-    for i in range(1):
+    for i in range(5):
         X_train,X_hold,y_train,y_hold=train_test_split(X,y,test_size=0.3)
         svc.fit(X_train,y_train)
         acc=svc.score(X_hold,y_hold)
@@ -111,10 +111,10 @@ def Titanic_svc():
     print "\nmean accuracy:",acc_mean,"and stddev:",acc_std
     ########################Step8:Predicting and Saving result######################################
     svc.fit(X,y)
-    return test_ids,svc.predict(X_test)
+    return test_ids,svc.predict(X_test),float(acc_mean)
     
 if __name__=='__main__':
-    test_ids,result=Titanic_svc()
+    test_ids,result,acc_mean=Titanic_svc()
     submission=np.asarray(zip(test_ids,result)).astype(int)
     #ensure passenger IDs in ascending order
     output=submission[submission[:,0].argsort()]

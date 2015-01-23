@@ -77,10 +77,10 @@ def Titanic_lg():
     acc_std="%.3f"%(np.std(test_accs))
     print "\nmean accuracy:",acc_mean,"and stddev:",acc_std
     ########################Step8:Predicting and Saving result######################################
-    return test_ids,forest.predict(X_test)
+    return test_ids,forest.predict(X_test),float(acc_mean)
     
 if __name__=='__main__':
-    test_ids,result=Titanic_lg()
+    test_ids,result,acc_mean=Titanic_lg()
     submission=np.asarray(zip(test_ids,result)).astype(int)
     #ensure passenger IDs in ascending order
     output=submission[submission[:,0].argsort()]
