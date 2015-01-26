@@ -2,6 +2,7 @@ import theano
 import theano.tensor as T
 import numpy as np
 from pandas import DataFrame,Series
+from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 import pandas as pd
 path='C:\\Users\\wei\\Desktop\\Kaggle\\Kaggle101\\Digit Recognizer\\'
 
@@ -39,12 +40,24 @@ def load_data(path):
     rval=[(train_set_x,train_set_y),(valid_set_x,valid_set_y),test_set_x]
     return rval
 
+def dropout(X,p=0.):
+    """
+    Add some noise to regularize by drop out by probility p
+    so to prevent overfitting
+    """
+    if p>0:
+        retain_prob=1-p
+        srng=RandomStreams()
+        X*=srng.binomial(X.shape,p=retain_prob,dtype=theano.config.floatX)
+        X/=retain_prob
+    return X
+
 ##################################
 #  The Logistic Regression Class #
 ##################################
 class LogisticRegression(object):
     """Multi-class Logistic Regression Class"""
-    def __init__(self,input,n_in,n_out):
+    def __init__(self,input,n_in,n_out,p_drop_logistic):
         """
         :type input: theano.tensor.TensorType
         :param input: symbolic variable that describes the input of the architecture(one minibatch)
@@ -54,9 +67,13 @@ class LogisticRegression(object):
         
         :type n_out: int
         :param n_out: number of output units,label dimension.
+        
+        :type p_drop_logistic:float
+        :param p_drop_logistic: add some noise by dropout by this probability
         """
+        input=dropout(input,p_drop_logistic)
         self.W=theano.shared(value=np.zeros((n_in,n_out),dtype=theano.config.floatX),name='W',borrow=True)
-        self.b=theano.shared(value=np.zeros(n_out,dtype=theano.config.floatX),name='b',borrow=True)
+        self.b=theano.shared(value=np.zeros((n_out,),dtype=theano.config.floatX),name='b',borrow=True)
         self.p_y_given_x=T.nnet.softmax(T.dot(input,self.W)+self.b)
         self.y_pred=T.argmax(self.p_y_given_x,axis=1)
         self.params=[self.W,self.b]
@@ -95,12 +112,13 @@ class LogisticRegression(object):
         
     def predict(self):
         return self.y_pred
+    
             
 ########################################
 #  The Hidden Layer (Perceptron) Class #
 ########################################
 class HiddenLayer(object):
-    def __init__(self,rng,input,n_in,n_out,W=None,b=None,activation=T.tanh):
+    def __init__(self,rng,input,n_in,n_out,W=None,b=None,activation=T.tanh,p_drop_perceptron=0.2):
         """
         Typical hidden layer of a MLP:units are fully-connected and have 
         tanh activation function.Weight matrix W is of shape (n_in,n_out),
@@ -120,17 +138,20 @@ class HiddenLayer(object):
 
         :type activation: theano.Op or function
         :param activation: Non linearity to be applied in the hidden layer
+        
+        :type p_drop_perceptron:float
+        :param p_drop_perceptron: add some noise by dropout by this probability
         """
-        self.input=input
+        self.input=dropout(input,p_drop_perceptron)
         if W is None:
             W_values=np.asarray(rng.uniform(low=-np.sqrt(6./(n_in+n_out)),
-                                high=-np.sqrt(6./(n_in+n_out)),size=(n_in,n_out)),
+                                high=np.sqrt(6./(n_in+n_out)),size=(n_in,n_out)),
                                 dtype=theano.config.floatX)
             if activation==theano.tensor.nnet.sigmoid:
                 W_values*=4
             W=theano.shared(value=W_values,name='W',borrow=True)
         if b is None:
-            b_values=np.zeros(n_out,dtype=theano.config.floatX)
+            b_values=np.zeros((n_out,),dtype=theano.config.floatX)
             b=theano.shared(value=b_values,name='b',borrow=True)
         self.W=W
         self.b=b
@@ -151,7 +172,7 @@ class MLP(object):
     top layer is a softamx layer (defined here by a ``LogisticRegression``
     class).
     """  
-    def __init__(self,rng,input,n_in,n_hidden,n_out):
+    def __init__(self,rng,input,n_in,n_hidden,n_out,p_drop_perceptron=0.2,p_drop_logistic=0.2):
         """
         :type rng: numpy.random.RandomState
         :param rng: a random number generator used to initialize weights
@@ -172,8 +193,8 @@ class MLP(object):
         which the labels lie
         """
         #We are now dealing with "one hidden layer+ logistic regression" ---Old Network
-        self.hiddenLayer=HiddenLayer(rng=rng,input=input,n_in=n_in,n_out=n_hidden,activation=T.tanh)
-        self.logRegressionLayer=LogisticRegression(input=self.hiddenLayer.output,n_in=n_hidden,n_out=n_out)
+        self.hiddenLayer=HiddenLayer(rng=rng,input=input,n_in=n_in,n_out=n_hidden,activation=T.tanh,p_drop_perceptron=p_drop_perceptron)
+        self.logRegressionLayer=LogisticRegression(input=self.hiddenLayer.output,n_in=n_hidden,n_out=n_out,p_drop_logistic=p_drop_logistic)
         #L1 regularization
         self.L1=abs(self.hiddenLayer.W).sum()+abs(self.logRegressionLayer.W).sum()
         #L2 regularization
@@ -187,10 +208,10 @@ class MLP(object):
 #  Train  a "old net" of MLP to solve MNIST #
 #############################################
 def train_old_net():
-    learning_rate=0.025
+    learning_rate=0.001
     L1_reg=0.00
     L2_reg=0.0001
-    n_epochs=50
+    n_epochs=100
     batch_size=20
     n_hidden=500
     datasets=load_data(path)
@@ -209,7 +230,11 @@ def train_old_net():
     y=T.ivector('y')
     rng=np.random.RandomState(1234567890)
     #construct the MLP class
-    classifier=MLP(rng=rng,input=x,n_in=28*28,n_hidden=n_hidden,n_out=10)
+    #Attention!!!
+    #this line to set p_drop_perceptron and p_drop_logistic
+    #if set no dropout then decrease the early stop threshold 
+    #improvement_threshold on line 292
+    classifier=MLP(rng=rng,input=x,n_in=28*28,n_hidden=n_hidden,n_out=10,p_drop_perceptron=0,p_drop_logistic=0)
     
     # the cost we minimize during training is the negative log likelihood of
     # the model plus the regularization terms (L1 and L2); cost is expressed
@@ -229,16 +254,27 @@ def train_old_net():
         gparam=T.grad(cost,param)
         gparams.append(gparam)
     
-    #specify how to update the parameters of the model as a list of 
-    #(variable,update expression) pairs
-    updates=[]
-    for param,gparam in zip(classifier.params,gparams):
-        updates.append((param,param-learning_rate*gparam))
+    #using RMSprop(scaling the gradient based on running average)
+    #to update the parameters of the model as a list of (variable,update expression) pairs
+    def RMSprop(gparams,params,learning_rate,rho=0.9,epsilon=1e-6):
+        """
+        param:rho,the fraction we keep the previous gradient contribution
+        """
+        updates=[]
+        for p,g in zip(params,gparams):
+            acc=theano.shared(p.get_value()*0.)
+            acc_new=rho*acc+(1-rho)*g**2
+            gradient_scaling=T.sqrt(acc_new+epsilon)
+            g=g/gradient_scaling
+            updates.append((acc,acc_new))
+            updates.append((p,p-learning_rate*g))
+        return updates
+        
         
     #compiling a Theano function 'train_model' that returns the cost
     #but in the same time updates the parameter of the model based on
     #the rules defined in 'updates'
-    train_model=theano.function(inputs=[index],outputs=cost,updates=updates,
+    train_model=theano.function(inputs=[index],outputs=cost,updates=RMSprop(gparams,classifier.params,learning_rate=0.001),
                                 givens={x:train_set_x[index*batch_size:(index+1)*batch_size],
                                         y:train_set_y[index*batch_size:(index+1)*batch_size]
                                         })
@@ -250,8 +286,10 @@ def train_old_net():
     #early-stopping parameters
     patience=10000 #look as this many examples regardless
     patience_increase=2 #wait the iter number longer when a new best is found
-    improvement_threshold=0.995 # a relative improvement of this much on validation set 
+    #improvement_threshold=0.995 # a relative improvement of this much on validation set 
                                 # considered as not overfitting 
+                                # if have added drop-out noise,we can increase the value
+    improvement_threshold=0.995
     validation_frequency=min(n_train_batches,patience/2)
                                 # every this much interval check on the validation set 
                                 # to see if the net is overfitting.
@@ -282,8 +320,20 @@ def train_old_net():
             if patience<=iter:
                 done_looping=True
                 break
-                           
 
+    ###########################################
+    # Predict with trained parameters(nonoise)#
+    ###########################################
+    classifier.p_drop_perceptron=0
+    classifier.p_drop_logistic=0
+    y_x=classifier.predict()
+    model_predict=theano.function(inputs=[index],outputs=y_x,givens={x:test_set_x[index*batch_size:(index+1)*batch_size]})
+    digit_preds=Series(np.concatenate([model_predict(i) for i in xrange(n_test_batches)]))
+    image_ids=Series(np.arange(1,len(digit_preds)+1))
+    submission=DataFrame([image_ids,digit_preds]).T
+    submission.columns=['ImageId','Label']
+    submission.to_csv(path+'submission_sample.csv',index=False)
+    
 if __name__=='__main__':
     debug_mode=False
     train_old_net()
